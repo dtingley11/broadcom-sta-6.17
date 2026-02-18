@@ -2,16 +2,29 @@
 
 Broadcom STA wireless driver (wl) version 6.30.223.271, patched to compile and run on **Linux kernel 6.17+**.
 
+Fixes WiFi on **MacBook Pro 2015** (and other Macs) running Linux with kernel 6.17+.
+
 Based on `broadcom-sta-dkms 6.30.223.271-23ubuntu1.1` from Ubuntu non-free.
+
+## Tested On
+
+- **MacBook Pro Mid-2015 (MacBookPro11,5)** — BCM4360, Ubuntu 24.04, kernel 6.17.0-14-generic
 
 ## Supported Hardware
 
 Any device supported by the original broadcom-sta driver, including:
 
-- BCM4360 (`14e4:43a0`) - tested on 2015 MacBook Pro
-- BCM43602 (`14e4:43ba`)
-- BCM4352 (`14e4:43b1`)
-- And other chips listed in `/usr/share/broadcom-sta/broadcom-sta.ids`
+| Chip | PCI ID | Found in |
+|------|--------|----------|
+| BCM4360 | `14e4:43a0` | MacBook Pro 2013–2015, iMac 2013–2015 |
+| BCM43602 | `14e4:43ba` | MacBook Pro 2015–2016, MacBook Air 2015 |
+| BCM4352 | `14e4:43b1` | MacBook Pro 2012–2013 |
+| BCM43228 | `14e4:4359` | Various laptops |
+| BCM4331 | `14e4:4331` | MacBook Pro 2011–2012, MacBook Air 2011–2012 |
+
+Full list in `/usr/share/broadcom-sta/broadcom-sta.ids`.
+
+**Keywords:** MacBook Pro WiFi Linux 6.17, MacBook Air WiFi Linux, Apple Mac wireless not working Linux, broadcom-sta DKMS build failed kernel 6.17, BCM4360 Linux driver, wl driver kernel 6.17
 
 ## Patches Applied
 
