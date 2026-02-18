@@ -41,7 +41,7 @@ Full list in `/usr/share/broadcom-sta/broadcom-sta.ids`.
 
 ## Install
 
-### Option 1: DKMS (recommended)
+### Option 1: Use pre-patched source (recommended)
 
 ```bash
 # Copy source to DKMS location
@@ -61,7 +61,18 @@ sudo modprobe -r brcmfmac bcma
 sudo modprobe wl
 ```
 
-### Option 2: Manual build
+### Option 2: Patch existing broadcom-sta-dkms install
+
+If you already have `broadcom-sta-dkms` installed from your distro's repos, you can patch it in-place:
+
+```bash
+sudo apt install broadcom-sta-dkms
+sudo bash patch-and-build.sh
+```
+
+The script patches the source at `/usr/src/broadcom-sta-6.30.223.271`, rebuilds via DKMS, and tells you how to load the driver. All patches are idempotent (safe to run multiple times).
+
+### Option 3: Manual build
 
 ```bash
 make KVER=$(uname -r)
