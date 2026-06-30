@@ -39,6 +39,31 @@ Full list in `/usr/share/broadcom-sta/broadcom-sta.ids`.
 | `wl_cfg80211_hybrid.c` | Added `radio_idx` param to `set_wiphy_params`, `set_tx_power`, `get_tx_power` | cfg80211 multi-radio API in 6.17 |
 | `wl_cfg80211_hybrid.c` | `/* falls through */` → `fallthrough;` | `-Wimplicit-fallthrough` fix |
 
+
+## Known issue: objtool error on newer Proxmox kernels
+
+Newer versions of the kernel, including Proxmox version 9 with the kernel 7.0.12-pve, might have problems when building the Broadcom wl driver.
+
+It usually occurs in connection with this line:
+
+    LD [M] wl.o
+
+The output could look something like this:
+
+    wl.o: error: objtool: aes_cbc_encrypt_pad+0x4c: unannotated intra-function call
+
+This occurs because some parts of the Broadcom driver consist of precompiled binary blobs. Newer kernels perform objtool analysis during compilation, but the blob lacks additional information expected by objtool.
+
+### Workaround
+
+Compile the driver without objtool enabled:
+
+    make KVER=$(uname -r) objtool=/bin/true
+
+For DKMS, add objtool=/bin/true to the MAKE[0] option in dkms.conf:
+
+    MAKE[0]="make KVER=$kernelver objtool=/bin/true"
+
 ## Install
 
 ### Option 1: Use pre-patched source (recommended)
