@@ -38,9 +38,14 @@ Full list in `/usr/share/broadcom-sta/broadcom-sta.ids`.
 | `linuxver.h` | `del_timer_sync` → `timer_delete` | Same timer API rename |
 | `wl_cfg80211_hybrid.c` | Added `radio_idx` param to `set_wiphy_params`, `set_tx_power`, `get_tx_power` | cfg80211 multi-radio API in 6.17 |
 | `wl_cfg80211_hybrid.c` | `/* falls through */` → `fallthrough;` | `-Wimplicit-fallthrough` fix |
+| `wl_cfg80211_hybrid.c` | Updated `get_station`, `get_tx_power`, and key operations to use `wireless_dev` | cfg80211 API compatibility for kernel 7.1+ |
+| `linux_osl.c`, `wl_linux.c` | Conditional `strncpy` → `strscpy`/`strscpy_pad`/`memcpy` | Kernel 7.2+ string API compatibility |
+| `wl_linux.c` | Conditional `linux/unaligned.h` include | Header moved in 6.12 |
+| `linuxver.h`, `src/include/lib80211.h` | Use a bundled compatibility header | Kernel removed `net/lib80211.h` in 6.13 |
+| `dkms.conf` | Add `objtool=/bin/true` to the DKMS build command | Work around objtool errors on kernels with precompiled Broadcom blobs |
 
 
-## Known issue: objtool error on newer Proxmox kernels
+## Objtool workaround on newer Proxmox kernels
 
 Newer versions of the kernel, including Proxmox version 9 with the kernel 7.0.12-pve, might have problems when building the Broadcom wl driver.
 
@@ -60,7 +65,7 @@ Compile the driver without objtool enabled:
 
     make KVER=$(uname -r) objtool=/bin/true
 
-For DKMS, add objtool=/bin/true to the MAKE[0] option in dkms.conf:
+The repository's `dkms.conf` already sets this for Option 1, and `patch-and-build.sh` adds it for Option 2:
 
     MAKE[0]="make KVER=$kernelver objtool=/bin/true"
 
@@ -95,12 +100,12 @@ sudo apt install broadcom-sta-dkms
 sudo bash patch-and-build.sh
 ```
 
-The script patches the source at `/usr/src/broadcom-sta-6.30.223.271`, rebuilds via DKMS, and tells you how to load the driver. All patches are idempotent (safe to run multiple times).
+The script patches the source at `/usr/src/broadcom-sta-6.30.223.271`, rebuilds via DKMS for the running kernel only, and tells you how to load the driver. It preserves DKMS installations for other kernels. Patching is designed to be idempotent, but stops with an error if critical source patterns are unrecognized; review those errors rather than forcing a build.
 
 ### Option 3: Manual build
 
 ```bash
-make KVER=$(uname -r)
+make KVER=$(uname -r) objtool=/bin/true
 sudo insmod wl.ko
 ```
 
