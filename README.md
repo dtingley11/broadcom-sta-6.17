@@ -9,6 +9,7 @@ Based on `broadcom-sta-dkms 6.30.223.271-23ubuntu1.1` from Ubuntu non-free.
 ## Tested On
 
 - **MacBook Pro Mid-2015 (MacBookPro11,5)** — BCM4360, Ubuntu 24.04, kernel 6.17.0-14-generic
+- **Mac Pro (Late 2013, MacPro6,1)** — Broadcom STA (wl)
 
 ## Supported Hardware
 
