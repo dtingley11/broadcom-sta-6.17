@@ -46,12 +46,15 @@ fi
 # 1. Makefile: EXTRA_CFLAGS -> ccflags-y, EXTRA_LDFLAGS -> ldflags-y
 # ---------------------------------------------------------------
 echo "[1/11] Patching Makefile (EXTRA_CFLAGS -> ccflags-y)..."
-if grep -q 'EXTRA_CFLAGS' "$SRC/Makefile"; then
+if grep -qE 'EXTRA_CFLAGS|EXTRA_LDFLAGS' "$SRC/Makefile"; then
     sed -i 's/EXTRA_CFLAGS/ccflags-y/g' "$SRC/Makefile"
     sed -i 's/EXTRA_LDFLAGS/ldflags-y/g' "$SRC/Makefile"
     echo "  Patched."
-else
+elif grep -q 'ccflags-y' "$SRC/Makefile"; then
     echo "  Already patched, skipping."
+else
+    echo "ERROR: Makefile has neither legacy EXTRA_CFLAGS nor patched ccflags-y; unsupported source layout." >&2
+    exit 1
 fi
 
 # ---------------------------------------------------------------
@@ -63,8 +66,11 @@ if grep -q 'ndo_do_ioctl' "$SRC/src/wl/sys/wl_linux.c"; then
     sed -i 's/^wl_ioctl(struct net_device \*dev, struct ifreq \*ifr, int cmd)/wl_ioctl(struct net_device *dev, struct ifreq *ifr, void __user *data, int cmd)/' "$SRC/src/wl/sys/wl_linux.c"
     sed -i 's/extern int  wl_ioctl(struct net_device \*dev, struct ifreq \*ifr, int cmd);/extern int  wl_ioctl(struct net_device *dev, struct ifreq *ifr, void __user *data, int cmd);/' "$SRC/src/wl/sys/wl_linux.h"
     echo "  Patched."
-else
+elif grep -q '\.ndo_siocdevprivate = wl_ioctl' "$SRC/src/wl/sys/wl_linux.c"; then
     echo "  Already patched, skipping."
+else
+    echo "ERROR: Unable to locate the ioctl operation in wl_linux.c; unsupported source layout." >&2
+    exit 1
 fi
 
 # ---------------------------------------------------------------
@@ -98,6 +104,10 @@ fi
 echo "[4/11] Ensuring linux/timer.h is included..."
 if ! grep -q '#include <linux/timer.h>' "$SRC/src/wl/sys/wl_linux.c"; then
     sed -i '/#include <linux\/delay.h>/a #include <linux/timer.h>' "$SRC/src/wl/sys/wl_linux.c"
+    if ! grep -Fq '#include <linux/timer.h>' "$SRC/src/wl/sys/wl_linux.c"; then
+        echo "ERROR: Could not insert linux/timer.h (linux/delay.h anchor absent)." >&2
+        exit 1
+    fi
     echo "  Added."
 else
     echo "  Already included, skipping."
@@ -130,6 +140,8 @@ elif old in content:
     content = content.replace(old, new, 1)
     changes += 1
     print("  Patched set_wiphy_params forward declaration")
+else:
+    raise SystemExit("ERROR: set_wiphy_params forward declaration: neither unpatched nor patched source pattern found")
 
 # 2. set_wiphy_params implementation
 old = 'static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)\n{'
@@ -145,6 +157,8 @@ elif old in content:
     content = content.replace(old, new, 1)
     changes += 1
     print("  Patched set_wiphy_params implementation")
+else:
+    raise SystemExit("ERROR: set_wiphy_params implementation: neither unpatched nor patched source pattern found")
 
 # 3. set_tx_power forward declaration
 old = """#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
@@ -168,6 +182,8 @@ elif old in content:
     content = content.replace(old, new, 1)
     changes += 1
     print("  Patched set_tx_power forward declaration")
+else:
+    raise SystemExit("ERROR: set_tx_power forward declaration: neither unpatched nor patched source pattern found")
 
 # 4. set_tx_power implementation
 old = """#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
@@ -191,6 +207,8 @@ elif old in content:
     content = content.replace(old, new, 1)
     changes += 1
     print("  Patched set_tx_power implementation")
+else:
+    raise SystemExit("ERROR: set_tx_power implementation: neither unpatched nor patched source pattern found")
 
 # 5. get_tx_power forward declaration
 old = """#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
@@ -269,7 +287,7 @@ def patch_file(path, label, replacements):
             changes += 1
             print(f"  Patched: {name}")
         else:
-            print(f"  {name}: not found, skipping.")
+            raise SystemExit(f"ERROR: {label}: {name}: neither unpatched nor patched source pattern found")
     if changes:
         with open(path, 'w') as f:
             f.write(content)
@@ -362,7 +380,7 @@ elif old in content:
         f.write(content)
     print("  Patched unaligned.h include guard.")
 else:
-    print("  unaligned.h anchor not found, skipping.")
+    raise SystemExit("ERROR: unaligned.h: neither the original nor guarded include pattern was found")
 PYEOF
 
 # ---------------------------------------------------------------
@@ -402,6 +420,8 @@ if old in content:
     print("  Patched get_station forward declaration (7.1)")
 elif new in content:
     print("  get_station forward declaration already patched")
+else:
+    raise SystemExit("ERROR: get_station forward declaration: neither unpatched nor patched source pattern found")
 
 # 2. get_tx_power forward declaration (>= 6.17: radio_idx + link_id;
 #    >= 6.14: link_id)
@@ -423,6 +443,8 @@ if old in content:
     print("  Patched get_tx_power forward declaration (6.17/6.14)")
 elif new in content:
     print("  get_tx_power forward declaration already patched")
+else:
+    raise SystemExit("ERROR: get_tx_power forward declaration: neither unpatched nor patched source pattern found")
 
 # 3. get_tx_power implementation (>= 6.17 / >= 6.14 branches)
 old = (
@@ -443,6 +465,8 @@ if old in content:
     print("  Patched get_tx_power implementation (6.17/6.14)")
 elif new in content:
     print("  get_tx_power implementation already patched")
+else:
+    raise SystemExit("ERROR: get_tx_power implementation: neither unpatched nor patched source pattern found")
 
 # 4. key-ops forward declarations (>= 7.1: wdev-based)
 old = (
@@ -469,6 +493,8 @@ if old in content:
     print("  Patched key-ops forward declarations (7.1)")
 elif new in content:
     print("  key-ops forward declarations already patched")
+else:
+    raise SystemExit("ERROR: key-ops forward declarations: neither unpatched nor patched source pattern found")
 
 # 5. add_key implementation signature (>= 7.1: wdev-based)
 old = (
@@ -492,6 +518,8 @@ if old in content:
     print("  Patched add_key implementation (7.1)")
 elif new in content:
     print("  add_key implementation already patched")
+else:
+    raise SystemExit("ERROR: add_key implementation: neither unpatched nor patched source pattern found")
 
 # 6. add_key implementation body: derive dev from wdev (>= 7.1)
 old = (
@@ -515,6 +543,8 @@ if old in content:
     print("  Patched add_key body dev derivation (7.1)")
 elif new in content:
     print("  add_key body already patched")
+else:
+    raise SystemExit("ERROR: add_key body: neither unpatched nor patched source pattern found")
 
 # 7. del_key implementation signature (>= 7.1: wdev-based)
 old = (
@@ -537,6 +567,8 @@ if old in content:
     print("  Patched del_key implementation (7.1)")
 elif new in content:
     print("  del_key implementation already patched")
+else:
+    raise SystemExit("ERROR: del_key implementation: neither unpatched nor patched source pattern found")
 
 # 8. del_key implementation body
 old = (
@@ -558,6 +590,8 @@ if old in content:
     print("  Patched del_key body dev derivation (7.1)")
 elif new in content:
     print("  del_key body already patched")
+else:
+    raise SystemExit("ERROR: del_key body: neither unpatched nor patched source pattern found")
 
 # 9. get_key implementation signature (>= 7.1: wdev-based)
 old = (
@@ -582,6 +616,8 @@ if old in content:
     print("  Patched get_key implementation (7.1)")
 elif new in content:
     print("  get_key implementation already patched")
+else:
+    raise SystemExit("ERROR: get_key implementation: neither unpatched nor patched source pattern found")
 
 # 10. get_key implementation body
 old = (
@@ -603,6 +639,8 @@ if old in content:
     print("  Patched get_key body dev derivation (7.1)")
 elif new in content:
     print("  get_key body already patched")
+else:
+    raise SystemExit("ERROR: get_key body: neither unpatched nor patched source pattern found")
 
 # 11. get_station implementation (>= 7.1: wdev-based) + body
 old = (
@@ -638,6 +676,8 @@ if old in content:
     print("  Patched get_station implementation + body (7.1)")
 elif new in content:
     print("  get_station implementation already patched")
+else:
+    raise SystemExit("ERROR: get_station implementation: neither unpatched nor patched source pattern found")
 
 with open(cfg_path, 'w') as f:
     f.write(content)
@@ -684,7 +724,7 @@ if old in content:
 elif new in content:
     print("  linuxver.h already patched, skipping.")
 else:
-    print("  WARNING: linuxver.h anchor not found, skipping.")
+    raise SystemExit("ERROR: linuxver.h: expected lib80211 include anchor not found")
 PYEOF
 else
     echo "  linuxver.h already patched, skipping."
@@ -832,8 +872,8 @@ else
     if grep -q 'objtool=/bin/true' "$SRC/dkms.conf"; then
         echo "  Patched."
     else
-        echo "  WARNING: dkms.conf MAKE[0] pattern not found, objtool not set."
-        echo "  On PVE 7.x, pass objtool=/bin/true manually when building."
+        echo "ERROR: dkms.conf MAKE[0] pattern not recognized; objtool workaround not installed." >&2
+        exit 1
     fi
 fi
 
@@ -841,8 +881,13 @@ fi
 # 11. DKMS rebuild
 # ---------------------------------------------------------------
 echo "[11/11] Rebuilding driver with DKMS..."
-dkms remove broadcom-sta/6.30.223.271 --all 2>/dev/null || true
-dkms install broadcom-sta/6.30.223.271 -k "$KVER" 2>&1
+# Only replace the build for the running kernel. Leave fallback kernels intact.
+dkms remove broadcom-sta/6.30.223.271 -k "$KVER" 2>/dev/null || true
+if ! dkms install broadcom-sta/6.30.223.271 -k "$KVER"; then
+    echo "ERROR: DKMS installation failed for kernel $KVER." >&2
+    echo "Check /var/lib/dkms/broadcom-sta/6.30.223.271/build/make.log" >&2
+    exit 1
+fi
 
 echo ""
 echo "=== Build complete ==="
